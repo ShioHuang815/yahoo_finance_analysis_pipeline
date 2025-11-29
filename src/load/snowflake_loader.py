@@ -135,14 +135,14 @@ class SnowflakeLoader:
                 df=df,
                 table_name=table_name,
                 database=conn.database,
-                schema='RAW',
+                schema='COBRA',
                 auto_create_table=create_table,
                 overwrite=False,  # Append mode
                 quote_identifiers=False
             )
             
             if success:
-                logger.info(f"Successfully loaded {num_rows} rows to RAW.{table_name}")
+                logger.info(f"Successfully loaded {num_rows} rows to COBRA.{table_name}")
                 
                 # Log to metadata
                 self._log_ingest_run(
@@ -183,10 +183,10 @@ class SnowflakeLoader:
         status: str,
         error_message: Optional[str] = None
     ):
-        """Log ingestion run to METADATA.INGEST_RUNS table."""
+        """Log ingestion run to COBRA.INGEST_RUNS table."""
         try:
             query = """
-            INSERT INTO METADATA.INGEST_RUNS 
+            INSERT INTO COBRA.INGEST_RUNS 
             (run_id, dataset_name, table_name, run_timestamp, records_loaded, status, error_message)
             VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
@@ -211,7 +211,7 @@ class SnowflakeLoader:
         """Update watermark for a dataset."""
         try:
             query = """
-            MERGE INTO METADATA.WATERMARKS w
+            MERGE INTO COBRA.WATERMARKS w
             USING (SELECT %s AS dataset_name, %s AS watermark_value, %s AS updated_at) s
             ON w.dataset_name = s.dataset_name
             WHEN MATCHED THEN
@@ -234,7 +234,7 @@ class SnowflakeLoader:
         try:
             query = """
             SELECT watermark_value 
-            FROM METADATA.WATERMARKS 
+            FROM COBRA.WATERMARKS 
             WHERE dataset_name = %s
             """
             

@@ -152,9 +152,9 @@ def verify_data_quality(**context):
     try:
         # Check row counts
         checks = [
-            ("RAW.STOCK_PRICES_DAILY", "stock prices"),
-            ("RAW.COMPANY_INFO", "company info"),
-            ("RAW.BENCHMARK_SERIES_DAILY", "benchmark series")
+            ("COBRA.STOCK_PRICES_DAILY", "stock prices"),
+            ("COBRA.COMPANY_INFO", "company info"),
+            ("COBRA.BENCHMARK_SERIES_DAILY", "benchmark series")
         ]
         
         results = {}
@@ -172,7 +172,7 @@ def verify_data_quality(**context):
         # Check for recent data (within last 7 days)
         recent_check = """
         SELECT MAX(date) as max_date 
-        FROM RAW.STOCK_PRICES_DAILY
+        FROM COBRA.STOCK_PRICES_DAILY
         """
         result = loader.execute_query(recent_check)
         if not result.empty:

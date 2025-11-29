@@ -61,7 +61,7 @@ def get_snowflake_connection():
                 role=params['role'],
                 warehouse=params['warehouse'],
                 database=params['database'],
-                schema='ANALYTICS',
+                schema='COBRA_analytics',
                 private_key=pkb
             )
     except Exception as e:
@@ -104,22 +104,20 @@ if page == "🏠 Home":
     with col1:
         st.metric(
             "Total Stocks",
-            run_query("SELECT COUNT(DISTINCT symbol) FROM dim_stocks")['COUNT(DISTINCT SYMBOL)'].iloc[0]
-            if not run_query("SELECT COUNT(DISTINCT symbol) FROM dim_stocks").empty else 0
+            run_query("SELECT COUNT(DISTINCT symbol) FROM COBRA_analytics.dim_stocks")['COUNT(DISTINCT SYMBOL)'].iloc[0]
+            if not run_query("SELECT COUNT(DISTINCT symbol) FROM COBRA_analytics.dim_stocks").empty else 0
         )
     
     with col2:
-        st.metric(
-            "Latest Data",
-            run_query("SELECT MAX(date) FROM fact_daily_metrics")['MAX(DATE)'].iloc[0]
-            if not run_query("SELECT MAX(date) FROM fact_daily_metrics").empty else "N/A"
-        )
+        max_date_result = run_query("SELECT MAX(date) FROM COBRA_analytics.fact_daily_metrics")
+        latest_date = str(max_date_result['MAX(DATE)'].iloc[0]) if not max_date_result.empty else "N/A"
+        st.metric("Latest Data", latest_date)
     
     with col3:
         st.metric(
             "Total Records",
-            f"{run_query('SELECT COUNT(*) FROM fact_daily_metrics')['COUNT(*)'].iloc[0]:,}"
-            if not run_query("SELECT COUNT(*) FROM fact_daily_metrics").empty else 0
+            f"{run_query('SELECT COUNT(*) FROM COBRA_analytics.fact_daily_metrics')['COUNT(*)'].iloc[0]:,}"
+            if not run_query("SELECT COUNT(*) FROM COBRA_analytics.fact_daily_metrics").empty else 0
         )
     
     st.markdown("---")
@@ -142,7 +140,7 @@ elif page == "🔍 Stock Screener":
     st.title("🔍 Stock Screener")
     
     # Load stock metadata
-    stocks_df = run_query("SELECT * FROM dim_stocks")
+    stocks_df = run_query("SELECT * FROM COBRA_analytics.dim_stocks")
     
     if not stocks_df.empty:
         # Filters
@@ -185,8 +183,8 @@ elif page == "🔍 Stock Screener":
             s.company_name,
             s.sector,
             s.industry
-        FROM fact_daily_metrics f
-        LEFT JOIN dim_stocks s ON f.symbol = s.symbol
+        FROM COBRA_analytics.fact_daily_metrics f
+        LEFT JOIN COBRA_analytics.dim_stocks s ON f.symbol = s.symbol
         WHERE 1=1 {where_sql}
         ORDER BY f.date DESC
         """
@@ -224,7 +222,7 @@ elif page == "📈 Benchmark Analysis":
     st.title("📈 Benchmark Analysis")
     
     # Stock selector
-    stocks_df = run_query("SELECT DISTINCT symbol, company_name FROM dim_stocks")
+    stocks_df = run_query("SELECT DISTINCT symbol, company_name FROM COBRA_analytics.dim_stocks")
     
     if not stocks_df.empty:
         col1, col2 = st.columns(2)
@@ -254,7 +252,7 @@ elif page == "📈 Benchmark Analysis":
             sp500_return,
             alpha_vs_sp500,
             vix_value
-        FROM fact_daily_metrics
+        FROM COBRA_analytics.fact_daily_metrics
         WHERE symbol = '{selected_stock}'
         ORDER BY date DESC
         LIMIT {date_range}
