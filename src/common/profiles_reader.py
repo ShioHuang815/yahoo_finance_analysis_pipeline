@@ -69,11 +69,19 @@ def get_snowflake_connection_params(
     private_key_bytes = None
     if config.get('private_key_path'):
         private_key_path = config['private_key_path']
+        
+        # Try container path first, then local path
+        local_path = private_key_path.replace('/usr/local/airflow/', '')
+        
         if os.path.exists(private_key_path):
             with open(private_key_path, 'rb') as key_file:
                 private_key_bytes = key_file.read()
+        elif os.path.exists(local_path):
+            # Use local path for testing
+            with open(local_path, 'rb') as key_file:
+                private_key_bytes = key_file.read()
         else:
-            raise FileNotFoundError(f"Private key not found: {private_key_path}")
+            raise FileNotFoundError(f"Private key not found at {private_key_path} or {local_path}")
     
     return {
         'account': config['account'],

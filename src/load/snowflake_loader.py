@@ -114,6 +114,15 @@ class SnowflakeLoader:
         conn = self._get_connection()
         run_id = generate_run_id()
         
+        # Make a copy to avoid modifying the original
+        df = df.copy()
+        
+        # Convert date columns to proper date format (not timestamp)
+        for col in df.columns:
+            if col.lower() == 'date' or 'date' in col.lower():
+                if pd.api.types.is_datetime64_any_dtype(df[col]):
+                    df[col] = df[col].dt.date
+        
         # Add run_id to DataFrame
         df['source_run_id'] = run_id
         

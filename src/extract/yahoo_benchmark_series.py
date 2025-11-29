@@ -57,10 +57,37 @@ def extract_yahoo_benchmark_series(
         
         # Handle single ticker vs multiple tickers
         if len(tickers) == 1:
-            df = data[['Close']].copy()
-            df['series_ticker'] = tickers[0]
+            # Single ticker - data structure is simpler
+            df = data.copy()
+            
+            # Flatten MultiIndex columns if present
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            
+            # Reset index to get date as a column
             df = df.reset_index()
-            df.columns = ['date', 'value', 'series_ticker']
+            
+            # Find the close price column
+            close_col = None
+            date_col = None
+            
+            for col in df.columns:
+                col_str = str(col).lower()
+                if col_str in ['close', 'adj close', 'adj_close']:
+                    close_col = col
+                elif col_str in ['date', 'datetime', 'index']:
+                    date_col = col
+            
+            # Select only the columns we need
+            if close_col and date_col:
+                df = df[[date_col, close_col]].copy()
+                df.columns = ['date', 'value']
+            else:
+                # Fallback: assume first column is date, second is close
+                df = df.iloc[:, :2].copy()
+                df.columns = ['date', 'value']
+            
+            df['series_ticker'] = tickers[0]
         else:
             dfs = []
             for ticker in tickers:
