@@ -139,15 +139,32 @@ if page == "🏠 Home":
 elif page == "🔍 Stock Screener":
     st.title("🔍 Stock Screener")
     
-    # Load stock metadata
-    stocks_df = run_query("SELECT * FROM COBRA_analytics.dim_stocks")
+    # Load stock summary data (aggregated to avoid large integers)
+    summary_query = """
+    SELECT 
+        s.symbol,
+        s.company_name,
+        s.sector,
+        s.industry,
+        MAX(f.market_cap_category) as market_cap_category,
+        MAX(f.date) as latest_date,
+        AVG(f.close) as avg_close,
+        AVG(f.daily_return) as avg_return,
+        AVG(f.alpha_vs_sp500) as avg_alpha
+    FROM COBRA_analytics.dim_stocks s
+    LEFT JOIN COBRA_analytics.fact_daily_metrics f ON s.symbol = f.symbol
+    GROUP BY s.symbol, s.company_name, s.sector, s.industry
+    ORDER BY s.symbol
+    """
     
-    if not stocks_df.empty:
+    stocks_summary = run_query(summary_query)
+    
+    if not stocks_summary.empty:
         # Filters
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            sectors = ['All'] + sorted(stocks_df['SECTOR'].dropna().unique().tolist())
+            sectors = ['All'] + sorted(stocks_summary['SECTOR'].dropna().unique().tolist())
             selected_sector = st.selectbox("Sector", sectors)
         
         with col2:
@@ -157,63 +174,62 @@ elif page == "🔍 Stock Screener":
         with col3:
             selected_stock = st.selectbox(
                 "Stock",
-                ['All'] + sorted(stocks_df['SYMBOL'].unique().tolist())
+                ['All'] + sorted(stocks_summary['SYMBOL'].unique().tolist())
             )
         
-        # Build query
-        where_clauses = []
+        # Filter data
+        filtered_df = stocks_summary.copy()
         if selected_sector != 'All':
-            where_clauses.append(f"sector = '{selected_sector}'")
+            filtered_df = filtered_df[filtered_df['SECTOR'] == selected_sector]
         if selected_cap != 'All':
-            where_clauses.append(f"market_cap_category = '{selected_cap}'")
+            filtered_df = filtered_df[filtered_df['MARKET_CAP_CATEGORY'] == selected_cap]
         if selected_stock != 'All':
-            where_clauses.append(f"f.symbol = '{selected_stock}'")
+            filtered_df = filtered_df[filtered_df['SYMBOL'] == selected_stock]
         
-        where_sql = " AND " + " AND ".join(where_clauses) if where_clauses else ""
-        
-        query = f"""
-        SELECT 
-            f.symbol,
-            f.date,
-            f.close,
-            f.daily_return,
-            CAST(f.volume AS VARCHAR) as volume,
-            f.alpha_vs_sp500,
-            f.market_cap_category,
-            s.company_name,
-            s.sector,
-            s.industry
-        FROM COBRA_analytics.fact_daily_metrics f
-        LEFT JOIN COBRA_analytics.dim_stocks s ON f.symbol = s.symbol
-        WHERE 1=1 {where_sql}
-        ORDER BY f.date DESC
-        LIMIT 10000
-        """
-        
-        data = run_query(query)
-        
-        if not data.empty:
-            st.markdown(f"### 📊 Showing {len(data['SYMBOL'].unique())} stocks")
+        if not filtered_df.empty:
+            st.markdown(f"### 📊 Showing {len(filtered_df)} stocks")
             
-            # Price chart
-            st.markdown("#### Price Trends")
-            fig = px.line(
-                data,
-                x='DATE',
-                y='CLOSE',
-                color='SYMBOL',
-                title='Stock Price Over Time'
-            )
-            fig.update_layout(height=500)
-            st.plotly_chart(fig, use_container_width=True)
+            # Summary table
+            st.markdown("#### Stock Performance Summary")
+            display_df = filtered_df[[
+                'SYMBOL', 'COMPANY_NAME', 'SECTOR', 'MARKET_CAP_CATEGORY',
+                'LATEST_DATE', 'AVG_CLOSE', 'AVG_RETURN', 'AVG_ALPHA'
+            ]].copy()
             
-            # Performance table
-            st.markdown("#### Latest Performance")
-            latest = data.groupby('SYMBOL').first().reset_index()
-            st.dataframe(
-                latest[['SYMBOL', 'COMPANY_NAME', 'CLOSE', 'DAILY_RETURN', 'ALPHA_VS_SP500', 'MARKET_CAP_CATEGORY']],
-                use_container_width=True
-            )
+            # Format columns
+            display_df['AVG_CLOSE'] = display_df['AVG_CLOSE'].round(2)
+            display_df['AVG_RETURN'] = (display_df['AVG_RETURN'] * 100).round(2).astype(str) + '%'
+            display_df['AVG_ALPHA'] = (display_df['AVG_ALPHA'] * 100).round(2).astype(str) + '%'
+            
+            st.dataframe(display_df, use_container_width=True, height=400)
+            
+            # Get time series data for selected stocks (last 30 days only)
+            symbols = "','".join(filtered_df['SYMBOL'].tolist())
+            ts_query = f"""
+            SELECT 
+                f.symbol,
+                f.date,
+                f.close,
+                f.daily_return
+            FROM COBRA_analytics.fact_daily_metrics f
+            WHERE f.symbol IN ('{symbols}')
+            AND f.date >= DATEADD(day, -30, CURRENT_DATE())
+            ORDER BY f.date DESC
+            """
+            
+            ts_data = run_query(ts_query)
+            
+            if not ts_data.empty:
+                st.markdown("#### Price Trends (Last 30 Days)")
+                fig = px.line(
+                    ts_data.sort_values('DATE'),
+                    x='DATE',
+                    y='CLOSE',
+                    color='SYMBOL',
+                    title='Stock Price Over Time'
+                )
+                fig.update_layout(height=500)
+                st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("No data found for selected filters")
     else:
