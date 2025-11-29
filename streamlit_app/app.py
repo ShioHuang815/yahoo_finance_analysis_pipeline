@@ -177,7 +177,7 @@ elif page == "🔍 Stock Screener":
             f.date,
             f.close,
             f.daily_return,
-            f.volume,
+            CAST(f.volume AS VARCHAR) as volume,
             f.alpha_vs_sp500,
             f.market_cap_category,
             s.company_name,
@@ -187,6 +187,7 @@ elif page == "🔍 Stock Screener":
         LEFT JOIN COBRA_analytics.dim_stocks s ON f.symbol = s.symbol
         WHERE 1=1 {where_sql}
         ORDER BY f.date DESC
+        LIMIT 10000
         """
         
         data = run_query(query)
