@@ -4,7 +4,7 @@ sources:
   - name: raw
     description: "Raw data loaded from Yahoo Finance"
     database: MLDS430
-    schema: RAW
+    schema: COBRA
     tables:
       - name: stock_prices_daily
         description: "Daily OHLCV stock prices"
